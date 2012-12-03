@@ -9,17 +9,21 @@ package virtualdisk;
 import java.io.RandomAccessFile;
 import java.io.FileNotFoundException;
 import java.io.IOException;
+import java.util.LinkedList;
+import java.util.Queue;
 
 import common.Constants;
 import common.Constants.DiskOperationType;
 import dblockcache.DBuffer;
 
-public abstract class VirtualDisk implements IVirtualDisk {
+public class VirtualDisk implements IVirtualDisk, Runnable {
 
 	private String _volName;
 	private RandomAccessFile _file;
 	private int _maxVolSize;
-
+	private Queue<VirtualDiskRequest> queue = new LinkedList<VirtualDiskRequest>();
+	private Object requestPoolLock = new Object();
+	
 	/*
 	 * VirtualDisk Constructors
 	 */
@@ -63,9 +67,21 @@ public abstract class VirtualDisk implements IVirtualDisk {
 	 * -- buf is an DBuffer object that needs to be read/write from/to the volume.	
 	 * -- operation is either READ or WRITE  
 	 */
-	public abstract void startRequest(DBuffer buf, DiskOperationType operation) throws IllegalArgumentException,
-			IOException;
+	public void startRequest(DBuffer buf, DiskOperationType operation) throws IllegalArgumentException,
+			IOException{
+		VirtualDiskRequest vdr = new VirtualDiskRequest(buf,operation);
+		enqueue(vdr);
+	}
 	
+	private void enqueue(VirtualDiskRequest vdr) {
+		synchronized(queue){
+			queue.add(vdr);
+		}
+		synchronized(requestPoolLock){
+			requestPoolLock.notify();
+		}
+	}
+
 	/*
 	 * Clear the contents of the disk by writing 0s to it
 	 */
@@ -116,5 +132,57 @@ public abstract class VirtualDisk implements IVirtualDisk {
 		int seekLen = buf.getBlockID() * Constants.BLOCK_SIZE;
 		_file.seek(seekLen);
 		_file.write(buf.getBuffer(), 0, Constants.BLOCK_SIZE);
+	}
+	
+	@Override
+	public void run() {
+		while(true){
+			VirtualDiskRequest vdr = null;
+			synchronized(queue){
+				if(!queue.isEmpty()){
+					vdr = queue.poll();
+				}
+			}
+			if(vdr != null){
+				commitRequest(vdr);
+			}
+			else{
+				synchronized(requestPoolLock){
+					try {
+						requestPoolLock.wait();
+					} catch (InterruptedException e) {
+						// TODO Auto-generated catch block
+						e.printStackTrace();
+					}
+				}
+			}
+		}
+	}
+
+	private void commitRequest(VirtualDiskRequest vdr) {
+		try{
+			switch(vdr.operation){
+			case READ:
+				readBlock(vdr.buf);
+				break;
+			case WRITE:
+				writeBlock(vdr.buf);
+				break;
+			}
+		}catch(IOException ex){
+			//TODO do something
+		}
+	}
+
+	public class VirtualDiskRequest{
+
+		DBuffer buf;
+		DiskOperationType operation;
+		
+		public VirtualDiskRequest(DBuffer buf, DiskOperationType operation){
+			this.buf = buf;
+			this.operation = operation;
+		}
+		
 	}
 }

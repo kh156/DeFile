@@ -176,6 +176,5 @@ public class VirtualDisk implements IVirtualDisk, Runnable {
             this.buf = buf;
             this.operation = operation;
         }
-
     }
 }

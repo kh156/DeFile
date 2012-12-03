@@ -119,9 +119,11 @@ public class DFS {
         for (int i=0; i<blocks.size(); i++) {
             DBuffer dbuff = cache.getBlock(blocks.get(i));
             if (dbuff.read(buffer, startOffset + i*Constants.BLOCK_SIZE, readsize - i*Constants.BLOCK_SIZE) == -1) {
+                cache.releaseBlock(dbuff);
                 f.read.unlock();
                 return -1;
             }
+            cache.releaseBlock(dbuff);
         }
         f.read.unlock();
         return readsize;
@@ -153,7 +155,7 @@ public class DFS {
         // find free blocks
         int head = 0;
         synchronized(blockMap) {
-            for (int i=0; i<numBlocks; i++) {
+            for (int i= Constants.NUM_OF_INODE / (Constants.BLOCK_SIZE / Constants.INODE_SIZE); i<numBlocks; i++) {
                 while (head<blockMap.length && blockMap[head] == true) {
                     head++;
                 }
@@ -176,9 +178,11 @@ public class DFS {
         for (int i=0; i<blocks.size(); i++) {
             DBuffer dbuff = cache.getBlock(blocks.get(i));
             if (dbuff.write(buffer, startOffset + i*Constants.BLOCK_SIZE, writesize - i*Constants.BLOCK_SIZE) == -1) {
+                cache.releaseBlock(dbuff);
                 f.write.unlock();
                 return -1;
             }
+            cache.releaseBlock(dbuff);
         }
         f.write.unlock();
         return writesize;

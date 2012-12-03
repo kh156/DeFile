@@ -10,7 +10,7 @@ public class Constants {
 	
 	public static final int CACHE_SIZE = 16; 
 	public static final int NUM_OF_INODE = 512;
-	public static final int INODE_SIZE = 128;
+	public static final int INODE_SIZE = 256;
     public static final int NUM_OF_BLOCK_IN_DFILE = 50;
 	
 	

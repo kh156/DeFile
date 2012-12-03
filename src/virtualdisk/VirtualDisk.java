@@ -142,18 +142,18 @@ public class VirtualDisk implements IVirtualDisk, Runnable {
 				if(!queue.isEmpty()){
 					vdr = queue.poll();
 				}
-			}
-			if(vdr != null){
-				commitRequest(vdr);
-			}
-			else{
-				synchronized(requestPoolLock){
+				if(vdr != null){
+					commitRequest(vdr);
+				}
+				else{
+
 					try {
-						requestPoolLock.wait();
+						queue.wait();
 					} catch (InterruptedException e) {
 						// TODO Auto-generated catch block
 						e.printStackTrace();
 					}
+
 				}
 			}
 		}

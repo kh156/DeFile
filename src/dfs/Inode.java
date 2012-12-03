@@ -1,6 +1,9 @@
 package dfs;
 
 import java.util.*;
+import java.util.concurrent.locks.Lock;
+import java.util.concurrent.locks.ReadWriteLock;
+import java.util.concurrent.locks.ReentrantReadWriteLock;
 
 import common.Constants;
 
@@ -10,6 +13,10 @@ public class Inode {
     private List<Integer> blockList;
     private int size;
     private boolean isUsed;
+    
+    private final ReentrantReadWriteLock readWriteLock = new ReentrantReadWriteLock();
+    public final Lock read  = readWriteLock.readLock();
+    public final Lock write = readWriteLock.writeLock();
     
     public Inode(int index) {
         this.index = index;
@@ -55,6 +62,10 @@ public class Inode {
     
     public void setUsed(boolean f) {
         isUsed = f;
+    }
+    
+    public void initializeFromDisk() {
+        
     }
     
     public void updateDisk() {

@@ -1,6 +1,7 @@
 package dfs;
 
 import java.util.*;
+import java.util.concurrent.locks.ReadWriteLock;
 
 import common.Constants;
 import common.DFileID;
@@ -13,17 +14,19 @@ public class DFS {
     private String _volName;
 
     private DBufferCache cache;
-    private Inode[] dfileMap;
+    private Inode[] inodeMap;
     private boolean[] blockMap;
+
 
     DFS(String volName, boolean format) {
         _volName = volName;
         _format = format;
         cache = new DBufferCache(Constants.CACHE_SIZE);
-        dfileMap = new Inode[Constants.NUM_OF_INODE];
+        inodeMap = new Inode[Constants.NUM_OF_INODE];
         blockMap = new boolean[Constants.NUM_OF_BLOCKS];        // lock on the map????????????
 
-        initializeDFile();
+
+        initializeInode();
     }
 
     DFS(boolean format) {
@@ -34,8 +37,11 @@ public class DFS {
         this(Constants.vdiskName,false);
     }
 
-    public void initializeDFile() {
-
+    private void initializeInode() {
+        for (int i=0; i<inodeMap.length; i++) {
+            inodeMap[i] = new Inode(i);
+            inodeMap[i].initializeFromDisk();
+        }
     }
 
     /*
@@ -44,11 +50,19 @@ public class DFS {
      */
     public boolean format() {
         if (_format) {
-            Arrays.fill(blockMap, false);
-            for (Inode f:dfileMap) {
+            for (Inode f:inodeMap) {
+                f.write.lock();
+            }
+            synchronized(blockMap) {
+                Arrays.fill(blockMap, false);
+            }
+            for (Inode f:inodeMap) {
                 f.clearContent();
                 f.setUsed(false);
                 f.updateDisk();                // need optimized!!!!!!!!!!!!
+            }
+            for (Inode f:inodeMap) {
+                f.write.unlock();
             }
             return true;
         }
@@ -59,26 +73,33 @@ public class DFS {
 
     /* creates a new DFile and returns the DFileID, which is useful to uniquely identify the DFile*/
     public DFileID createDFile() {
-        for (Inode f:dfileMap) {
+        for (Inode f:inodeMap) {
+            f.write.lock();
             if (!f.isUsed()) {
                 f.clearContent();
                 f.setUsed(true);
-                f.updateDisk();              
+                f.updateDisk();          
+                f.write.unlock();
                 return new DFileID(f.getIndex());
             }
+            f.write.unlock();
         }
         return null;
     }
 
     /* destroys the file specified by the DFileID */
     public void destroyDFile(DFileID dFID) {
-        Inode f = dfileMap[dFID.getID()];
-        for (int i:f.getBlockList()) {
-            blockMap[i] = false;
+        Inode f = inodeMap[dFID.getID()];
+        f.write.lock();
+        synchronized(blockMap) {
+            for (int i:f.getBlockList()) {
+                blockMap[i] = false;
+            }
         }
         f.clearContent();
         f.setUsed(false);
         f.updateDisk();
+        f.write.unlock();
     }
 
     /*
@@ -86,17 +107,23 @@ public class DFS {
      * buffer offset startOffset; at most count bytes are transferred
      */
     public int read(DFileID dFID, byte[] buffer, int startOffset, int count) {
-        Inode dfile = dfileMap[dFID.getID()];
-        if (!dfile.isUsed()) return -1;
-        
-        int readsize = Math.min(dfile.getSize(), count);
-        List<Integer> blocks = dfile.getBlockList();
+        Inode f = inodeMap[dFID.getID()];
+        f.read.lock();
+        if (!f.isUsed()) {
+            f.read.unlock();
+            return -1;
+        }
+
+        int readsize = Math.min(f.getSize(), count);
+        List<Integer> blocks = f.getBlockList();
         for (int i=0; i<blocks.size(); i++) {
             DBuffer dbuff = cache.getBlock(blocks.get(i));
             if (dbuff.read(buffer, startOffset + i*Constants.BLOCK_SIZE, readsize - i*Constants.BLOCK_SIZE) == -1) {
+                f.read.unlock();
                 return -1;
             }
         }
+        f.read.unlock();
         return readsize;
     }
 
@@ -105,53 +132,71 @@ public class DFS {
      * buffer offset startOffsetl at most count bytes are transferred
      */
     public int write(DFileID dFID, byte[] buffer, int startOffset, int count) {
-        Inode dfile = dfileMap[dFID.getID()];
-        if (!dfile.isUsed()) return -1;
-        
-        // clear used blocks first
-        for (int i:dfile.getBlockList()) {
-            blockMap[i] = false;
+        Inode f = inodeMap[dFID.getID()];
+        f.write.lock();
+        if (!f.isUsed()) {
+            f.write.unlock();
+            return -1;
         }
-        dfile.clearContent();
-        
+
+        // clear used blocks first
+        synchronized(blockMap) {
+            for (int i:f.getBlockList()) {
+                blockMap[i] = false;
+            }
+        }
+        f.clearContent();
+
         int writesize = Math.min(buffer.length-startOffset, count);
         int numBlocks = writesize / Constants.BLOCK_SIZE;
-        
+
         // find free blocks
         int head = 0;
-        for (int i=0; i<numBlocks; i++) {
-            while (head<blockMap.length && blockMap[head] == true) {
-                head++;
+        synchronized(blockMap) {
+            for (int i=0; i<numBlocks; i++) {
+                while (head<blockMap.length && blockMap[head] == true) {
+                    head++;
+                }
+                if (head >= blockMap.length) {
+                    f.write.unlock();
+                    return -1;
+                }
+                blockMap[head] = true;
+                f.addBlock(head);
             }
-            if (head >= blockMap.length) {
-                return -1;
-            }
-            blockMap[head] = true;
-            dfile.addBlock(head);
         }
-        
-        // set DFile size
-        dfile.setSize(writesize);
-        
-        // update inode
-        dfile.updateDisk();
 
-        List<Integer> blocks = dfile.getBlockList();
+        // set DFile size
+        f.setSize(writesize);
+
+        // update inode
+        f.updateDisk();
+
+        List<Integer> blocks = f.getBlockList();
         for (int i=0; i<blocks.size(); i++) {
             DBuffer dbuff = cache.getBlock(blocks.get(i));
             if (dbuff.write(buffer, startOffset + i*Constants.BLOCK_SIZE, writesize - i*Constants.BLOCK_SIZE) == -1) {
+                f.write.unlock();
                 return -1;
             }
         }
+        f.write.unlock();
         return writesize;
     }
 
     /* returns the size in bytes of the file indicated by DFileID. */
     public int sizeDFile(DFileID dFID) {
-        if (dfileMap[dFID.getID()].isUsed()) {
-            return dfileMap[dFID.getID()].getSize();    
+        Inode f = inodeMap[dFID.getID()];
+        f.read.lock();
+        if (f.isUsed()) {
+            try {
+                return f.getSize();    
+            } finally {
+                f.read.unlock();
+            }
         }
         else {
+            f.read.unlock();
             return -1;
         }
     }
@@ -161,14 +206,16 @@ public class DFS {
      */
     public List<DFileID> listAllDFiles() {
         List<DFileID> list = new ArrayList<DFileID>();
-        for (int i=0; i<dfileMap.length; i++) {
-            if (dfileMap[i].isUsed()) {
-                list.add(new DFileID(i));
+        for (Inode f:inodeMap) {
+            f.read.lock();
+            if (f.isUsed()) {
+                list.add(new DFileID(f.getIndex()));
             }
+            f.read.unlock();
         }
         return list;
     }
-    
+
     /* Write back all dirty blocks to the volume, and wait for completion. */
     public void sync() {
         cache.sync();               // ?????????????????????????????

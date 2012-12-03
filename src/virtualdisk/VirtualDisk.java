@@ -14,7 +14,7 @@ import common.Constants;
 import common.Constants.DiskOperationType;
 import dblockcache.DBuffer;
 
-public abstract class VirtualDisk implements IVirtualDisk {
+public class VirtualDisk implements IVirtualDisk {
 
 	private String _volName;
 	private RandomAccessFile _file;
@@ -63,8 +63,12 @@ public abstract class VirtualDisk implements IVirtualDisk {
 	 * -- buf is an DBuffer object that needs to be read/write from/to the volume.	
 	 * -- operation is either READ or WRITE  
 	 */
-	public abstract void startRequest(DBuffer buf, DiskOperationType operation) throws IllegalArgumentException,
-			IOException;
+	public void startRequest(DBuffer buf, DiskOperationType operation) throws IllegalArgumentException,
+			IOException{
+		VirtualDiskRequest vdr = new VirtualDiskRequest(buf,operation);
+		vdr.start();
+	}
+	
 	
 	/*
 	 * Clear the contents of the disk by writing 0s to it
@@ -116,5 +120,37 @@ public abstract class VirtualDisk implements IVirtualDisk {
 		int seekLen = buf.getBlockID() * Constants.BLOCK_SIZE;
 		_file.seek(seekLen);
 		_file.write(buf.getBuffer(), 0, Constants.BLOCK_SIZE);
+	}
+	
+	public class VirtualDiskRequest implements Runnable{
+
+		DBuffer buf;
+		DiskOperationType operation;
+		
+		public VirtualDiskRequest(DBuffer buf, DiskOperationType operation){
+			this.buf = buf;
+			this.operation = operation;
+		}
+		
+		public void start(){
+			Thread t = new Thread(this);
+			t.start();
+		}
+		
+		@Override
+		public void run(){
+			try{
+			switch(operation){
+			case READ:
+				readBlock(buf);
+			case WRITE:
+				writeBlock(buf);
+			}
+			}
+			catch(IOException ex){
+				//TODO: fill this in
+			}
+		}
+		
 	}
 }

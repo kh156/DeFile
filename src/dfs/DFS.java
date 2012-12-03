@@ -151,7 +151,9 @@ public class DFS {
 
         int writesize = Math.min(buffer.length-startOffset, count);
         int numBlocks = writesize / Constants.BLOCK_SIZE;
-
+        if (writesize % Constants.BLOCK_SIZE > 0)
+            numBlocks ++;
+        
         // find free blocks
         int head = 0;
         synchronized(blockMap) {
@@ -171,7 +173,7 @@ public class DFS {
         // set DFile size
         f.setSize(writesize);
 
-        // update inode
+        // update inode region on disk
         f.updateDisk();
 
         List<Integer> blocks = f.getBlockList();

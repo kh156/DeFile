@@ -47,7 +47,7 @@ public class DFS {
      * If format is true, the system should format the underlying disk contents,
      * i.e., initialize to empty. On success returns true, else return false.
      */
-    public boolean format() {
+    public synchronized boolean format() {
         if (_format) {
             for (Inode f:inodeMap) {
                 f.write.lock();
@@ -117,7 +117,7 @@ public class DFS {
         List<Integer> blocks = f.getBlockList();
         for (int i=0; i<blocks.size(); i++) {
             DBuffer dbuff = cache.getBlock(blocks.get(i));
-            if (dbuff.read(buffer, startOffset + i*Constants.BLOCK_SIZE, readsize - i*Constants.BLOCK_SIZE) == -1) {
+            if (dbuff.read(buffer, startOffset + i*Constants.BLOCK_SIZE, Math.min(readsize - i*Constants.BLOCK_SIZE, Constants.BLOCK_SIZE)) == -1) {
                 cache.releaseBlock(dbuff);
                 f.read.unlock();
                 return -1;
@@ -178,7 +178,7 @@ public class DFS {
         List<Integer> blocks = f.getBlockList();
         for (int i=0; i<blocks.size(); i++) {
             DBuffer dbuff = cache.getBlock(blocks.get(i));
-            if (dbuff.write(buffer, startOffset + i*Constants.BLOCK_SIZE, writesize - i*Constants.BLOCK_SIZE) == -1) {
+            if (dbuff.write(buffer, startOffset + i*Constants.BLOCK_SIZE, Math.min(writesize - i*Constants.BLOCK_SIZE, Constants.BLOCK_SIZE)) == -1) {
                 cache.releaseBlock(dbuff);
                 f.write.unlock();
                 return -1;

@@ -23,7 +23,7 @@ public class DBuffer {
         buffer = new byte[size];
     }
 
-    public void startFetch() {
+    private void startFetch() {
         try {
             clean = false;
             vd.startRequest(this, DiskOperationType.READ);
@@ -37,7 +37,7 @@ public class DBuffer {
         this.waitClean();
     }
 
-    public void startPush() {
+    private void startPush() {
         try {
             clean = false;
             vd.startRequest(this, DiskOperationType.WRITE);
@@ -50,12 +50,17 @@ public class DBuffer {
         }
         this.waitClean();
     }
+    
+    public void evict() {
+        startPush();
+        this.clean = true;
+    }
 
-    public synchronized boolean checkValid() {
+    public boolean checkValid() {
         return valid;
     }
 
-    public synchronized boolean waitValid() {
+    public boolean waitValid() {
         while(valid == false){
             try {
                 wait();
@@ -67,16 +72,16 @@ public class DBuffer {
         return valid;
     }
 
-    public synchronized void setValid(boolean v) {
+    public void setValid(boolean v) {
         valid = v;
         notifyAll();
     }
 
-    public synchronized boolean checkClean() {
+    public boolean checkClean() {
         return clean;
     }
 
-    public synchronized boolean waitClean() {
+    public boolean waitClean() {
         while(clean == false){
             try {
                 wait();
@@ -88,15 +93,15 @@ public class DBuffer {
         return clean;
     }
 
-    public synchronized boolean isBusy() {
+    public boolean isBusy() {
         return busy;
     }
 
-    public synchronized void setBusy(boolean b) {
+    public void setBusy(boolean b) {
         busy = b;
     }
 
-    public synchronized int read(byte[] buffer, int startOffset, int count) {
+    public int read(byte[] buffer, int startOffset, int count) {
         if(startOffset < 0 || startOffset + count < buffer.length || count > this.size)
             return -1;
         if (!valid) {
@@ -105,35 +110,40 @@ public class DBuffer {
         for(int i = 0; i < count; i++){
             buffer[startOffset+i] = this.buffer[i];
         }
+        this.valid = true;
         return count;
     }
 
-    public synchronized int write(byte[] buffer, int startOffset, int count) {
+    public int write(byte[] buffer, int startOffset, int count) {
         if(startOffset < 0 || startOffset + count < buffer.length || count > this.size)
             return -1;
-        if (!valid) {
-            startPush();
-        }
         for(int i = 0; i < count; i++){
             this.buffer[i] = buffer[startOffset+i];
         }
+        // erase the rest bytes
+        for (int i=count; i<this.buffer.length; i++) {
+            this.buffer[i] = 0; 
+        }
+        this.valid = true;
+        // mark dirty!!!!
+        this.clean = false;
         return count;
     }
 
-    public synchronized void ioComplete() {
+    public void ioComplete() {
         clean = true;
         notifyAll();
     }
 
-    public synchronized int getBlockID() {
+    public int getBlockID() {
         return blockID;
     }
 
-    public synchronized void setBlockID(int id) {
+    public void setBlockID(int id) {
         blockID = id;
     }
 
-    public synchronized byte[] getBuffer() {
+    public byte[] getBuffer() {
         //can simply return buffer?? or need to copy?
         return buffer;
     }

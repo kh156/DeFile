@@ -23,7 +23,7 @@ public class VirtualDisk implements IVirtualDisk, Runnable {
     private int _maxVolSize;
     private Queue<VirtualDiskRequest> queue = new LinkedList<VirtualDiskRequest>();
     private Object requestPoolLock = new Object();
-
+    private Thread requestManager;
     /*
      * VirtualDisk Constructors
      */
@@ -50,6 +50,9 @@ public class VirtualDisk implements IVirtualDisk, Runnable {
             formatStore();
         }
         /* Other methods as required */
+        
+        requestManager = new Thread(this);
+        requestManager.start();
     }
 
     public VirtualDisk(boolean format) throws FileNotFoundException,
@@ -148,7 +151,8 @@ public class VirtualDisk implements IVirtualDisk, Runnable {
                 }
                 vdr = queue.poll();
             }
-            commitRequest(vdr);
+            if(vdr != null)
+            	commitRequest(vdr);
         }
     }
 
@@ -162,6 +166,7 @@ public class VirtualDisk implements IVirtualDisk, Runnable {
                 writeBlock(vdr.buf);
                 break;
             }
+            vdr.buf.ioComplete();
         }catch(IOException ex){
             //TODO do something
         }

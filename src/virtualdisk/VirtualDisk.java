@@ -122,6 +122,8 @@ public class VirtualDisk implements IVirtualDisk, Runnable {
             return -1;
         }
         _file.seek(seekLen);
+//        System.err.println("read");
+
         return _file.read(buf.getBuffer(), 0, Constants.BLOCK_SIZE);
     }
 
@@ -133,6 +135,7 @@ public class VirtualDisk implements IVirtualDisk, Runnable {
         int seekLen = buf.getBlockID() * Constants.BLOCK_SIZE;
         _file.seek(seekLen);
         _file.write(buf.getBuffer(), 0, Constants.BLOCK_SIZE);
+//        System.err.println("wrote");
     }
 
     @Override

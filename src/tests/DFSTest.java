@@ -17,68 +17,191 @@ import dfs.DFS;
 
 public class DFSTest {
 
-	static DFS dfs;
-	
-	@BeforeClass
-	public static void setUpBeforeClass() throws Exception {
-		dfs = new DFS();
-	}
+    static DFS dfs;
 
-	@AfterClass
-	public static void tearDownAfterClass() throws Exception {
-	}
+    @BeforeClass
+    public static void setUpBeforeClass() throws Exception {
+        dfs = new DFS(true);
+    }
 
-	@Before
-	public void setUp() throws Exception {
-	}
+    @AfterClass
+    public static void tearDownAfterClass() throws Exception {
+    }
 
-	@After
-	public void tearDown() throws Exception {
-	}
+    @Before
+    public void setUp() throws Exception {
+    }
 
-	@Test
-	public void createAndDeleteFile() {
-		List<DFileID> before = dfs.listAllDFiles();
-		DFileID dfID = dfs.createDFile();
-		List<DFileID> after = dfs.listAllDFiles();
-		
-		assertFalse(before.contains(dfID));
-		assertTrue(after.size() == before.size()+1);
-		assertTrue(after.contains(dfID));
-		
-		dfs.destroyDFile(dfID);
-		List<DFileID> postAfter = dfs.listAllDFiles();
-		
-		assertFalse(postAfter.contains(dfID));
-		assertTrue(before.size() == postAfter.size());
-		for(DFileID d : before){
-			assertTrue(postAfter.contains(d));
-		}
-		for(DFileID d : postAfter){
-			assertTrue(before.contains(d));
-		}
-	}
-	
-	@Test
-	public void createFileAndWriteData() {
-	    DFileID file0 = dfs.createDFile();
-	    System.out.println(file0.getID());
-		DFileID file = dfs.createDFile();
-		System.out.println(file.getID());
-		assertEquals(dfs.sizeDFile(file),0);
-		
-		int size = Constants.BLOCK_SIZE * Constants.NUM_OF_BLOCK_IN_DFILE;
-		byte[] writeBuffer = new byte[size];
-		byte[] readBuffer = new byte[size];
-		for(int i = 0; i < size; i++)
-			writeBuffer[i] = (byte) (i*i);		//dummy data
-		dfs.write(file, writeBuffer, 0, size);
-		dfs.read(file, readBuffer, 0, size);
-		for(int i = 0; i < size; i++){
-//			System.out.println("wrote: " + writeBuffer[i] + " read: " + readBuffer[i]);
-		}
-		assertTrue(Arrays.equals(readBuffer, writeBuffer));
-	}
-	
+    @After
+    public void tearDown() throws Exception {
+    }
 
+    @Test
+    public void createAndDeleteFile() {
+        dfs.format();
+
+        List<DFileID> before = dfs.listAllDFiles();
+        DFileID dfID = dfs.createDFile();
+        List<DFileID> after = dfs.listAllDFiles();
+
+        System.out.println("dfID is " + dfID);
+
+        System.out.println("List size before file creation: " + before.size() + " after: " + after.size());
+        assertFalse(before.contains(dfID));
+        assertTrue(after.size() == before.size()+1);
+        assertTrue(after.contains(dfID));
+
+        dfs.destroyDFile(dfID);
+        List<DFileID> postAfter = dfs.listAllDFiles();
+
+        assertFalse(postAfter.contains(dfID));
+        assertTrue(before.size() == postAfter.size());
+        for(DFileID d : before){
+            assertTrue(postAfter.contains(d));
+        }
+        for(DFileID d : postAfter){
+            assertTrue(before.contains(d));
+        }
+    }
+
+    @Test
+    public void createFileAndWriteData() {
+        DFileID file0 = dfs.createDFile();
+        System.out.println(file0.getID());
+        DFileID file = dfs.createDFile();
+        assertEquals(0, dfs.sizeDFile(file));
+        int writeSize = 1024;
+
+        byte[] writeBuffer = new byte[writeSize];
+        for(int i = 0; i < writeSize; i++)
+            writeBuffer[i] = (byte) (i*i);		//dummy data
+        dfs.write(file, writeBuffer, 0, writeSize);
+        byte[] readBuffer = new byte[writeSize];
+        dfs.read(file, readBuffer, 0, writeSize);
+        for(int i = 0; i < writeSize; i++){
+            //			System.out.println("wrote: " + writeBuffer[i] + " read: " + readBuffer[i]);
+        }
+        assertTrue(Arrays.equals(readBuffer, writeBuffer));
+    }
+
+    @Test
+    public void testFormat(){
+        dfs.format();
+        assertEquals(0, dfs.listAllDFiles().size());
+    }
+
+    @Test
+    public void createMultipleFiles(){
+        dfs.format();
+        for(int i = 0; i < Constants.NUM_OF_INODE; i++){
+            assertNotNull(dfs.createDFile());
+        }
+        assertNull(dfs.createDFile());
+        assertEquals(Constants.NUM_OF_INODE, dfs.listAllDFiles().size());
+
+        Random r = new Random(1234);
+        int remainingBlocks = Constants.NUM_OF_BLOCKS - (Constants.INODE_SIZE * Constants.NUM_OF_INODE) / Constants.BLOCK_SIZE;
+
+        HashMap<Integer, byte[]> buffers = new HashMap<Integer,byte[]>();
+
+        for(DFileID file : dfs.listAllDFiles()){
+            byte[] writeBuffer = new byte[Math.abs(r.nextInt()) % (Constants.NUM_OF_BLOCK_IN_DFILE*Constants.BLOCK_SIZE)];
+            remainingBlocks -= (int) Math.ceil((double)writeBuffer.length / Constants.BLOCK_SIZE);
+            for(int i = 0; i < writeBuffer.length; i++){
+                writeBuffer[i] = (byte) (i*i+file.getID());
+            }
+            int count = dfs.write(file, writeBuffer, 0, writeBuffer.length);
+            if(remainingBlocks >= 0){
+                assertEquals(writeBuffer.length, count);
+                buffers.put(file.getID(), writeBuffer);
+                System.out.println("Wrote " + writeBuffer.length + "bytes to file " + file.getID() + " with remaining blocks: " + remainingBlocks);
+            }
+            else{
+                assertEquals(-1, count);
+                System.out.println("Failed to write to file " + file.getID() + " remaining blocks: " + remainingBlocks);
+                break;
+            }
+        }
+
+        for(DFileID file : dfs.listAllDFiles()){
+            if(!buffers.containsKey(file.getID()))
+                continue;
+            System.out.println("Starting to read file " + file.getID());
+            byte[] writeBuffer = buffers.get(file.getID());
+            byte[] readBuffer = new byte[writeBuffer.length];
+            assertEquals(writeBuffer.length, dfs.read(file, readBuffer, 0, writeBuffer.length));
+            assertTrue(Arrays.equals(writeBuffer, readBuffer));
+            System.out.println("Read file " + file.getID() + " successfully");
+        }
+    }
+
+    @Test
+    public void testMultipleThread() {
+        dfs.format();
+        int threadNum = 100;
+        int fileNum = Constants.NUM_OF_INODE / threadNum;
+        Thread[] threads = new Thread[threadNum];
+        for (int i=0; i<threadNum; i++) {
+            threads[i] = new Thread(new TestThread(i, fileNum, dfs));
+            threads[i].start();
+        }
+
+        for (Thread t:threads) {
+            try {
+                t.join();
+            } catch (InterruptedException e) {
+                e.printStackTrace();
+            }
+        }
+    }
+}
+
+class TestThread implements Runnable {
+    private int fileNum;
+    private int ID;
+    private DFS dfs;
+    HashMap<Integer, byte[]> buffers = new HashMap<Integer,byte[]>();
+    DFileID[] fileIDs;
+
+    public TestThread(int ID, int fileNum, DFS dfs) {
+        this.ID = ID;
+        this.fileNum = fileNum;
+        this.dfs = dfs;
+        
+        fileIDs = new DFileID[fileNum];
+    }
+
+    @Override
+    public void run() {
+        Random r = new Random(ID * 100);
+        
+        for (int k=0; k<fileNum; k++) {
+            DFileID file = dfs.createDFile();
+            fileIDs[k] = file;
+            byte[] writeBuffer = new byte[Math.abs(r.nextInt()) % (Constants.NUM_OF_BLOCK_IN_DFILE*Constants.BLOCK_SIZE)];
+            for(int i = 0; i < writeBuffer.length; i++){
+                writeBuffer[i] = (byte) (i*i + k * ID);
+            }
+            int count = dfs.write(fileIDs[k], writeBuffer, 0, writeBuffer.length);
+            if (count > 0){
+                assertEquals(writeBuffer.length, count);
+                buffers.put(file.getID(), writeBuffer);
+                System.out.println("Thread " + this.ID + " wrote " + writeBuffer.length + "bytes to file " + file.getID());
+            }
+            else{
+                System.out.println("Thread " + ID + " failed to write to file " + file.getID());
+                break;
+            }
+        }
+        
+        for (int k=0; k<fileNum; k++) {
+            DFileID file = fileIDs[k];
+            System.out.println("Thread " + ID + " starting to read file " + file.getID());
+            byte[] writeBuffer = buffers.get(file.getID());
+            byte[] readBuffer = new byte[writeBuffer.length];
+            assertEquals(writeBuffer.length, dfs.read(file, readBuffer, 0, writeBuffer.length));
+            assertTrue(Arrays.equals(writeBuffer, readBuffer));
+            System.out.println("Thread " + ID + " read file " + file.getID() + " successfully");
+        }
+    }
 }

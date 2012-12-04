@@ -48,7 +48,7 @@ public class DBuffer {
     }
 
     public void evict() {
-        if (this.clean = false) {
+        if (this.clean == false) {
             startPush();
             this.waitClean();
         }

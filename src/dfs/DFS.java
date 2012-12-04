@@ -23,11 +23,15 @@ public class DFS {
         cache = new DBufferCache(_volName, format, Constants.CACHE_SIZE);
         inodeMap = new Inode[Constants.NUM_OF_INODE];
         usedBlockMap = new boolean[Constants.NUM_OF_BLOCKS];        // lock on the map????????????
-        markInodeRegionAsUsed();
-        if(format){
-        	format();
-        }else{
-        	initializeAllInodes();
+
+        for (int i=0; i<inodeMap.length; i++) {
+            inodeMap[i] = new Inode(i);
+        }
+        if (format) {
+            format();
+        }
+        else {
+            initializeAllInodes();
         }
     }
 
@@ -47,10 +51,9 @@ public class DFS {
             DBuffer dbuf = cache.getBlock(blockID);
             dbuf.read(buffer, 0, Constants.BLOCK_SIZE);
             cache.releaseBlock(dbuf);
-            
-            inodeMap[i] = new Inode(i);
+
             inodeMap[i].initializeFromSerializedMetadata(buffer, inodeOffset*Constants.INODE_SIZE, Constants.INODE_SIZE);
-            
+
             if(inodeMap[i].isUsed()){
             	int size = inodeMap[i].getSize();
             	int numBlocks = inodeMap[i].getBlockList().size();
@@ -74,18 +77,18 @@ public class DFS {
             }
         }
     }
-    
+
     private void updateInode(Inode f) {
-    	int index = f.getIndex();
-    	int blockID = index / (Constants.BLOCK_SIZE/Constants.INODE_SIZE);
+        int index = f.getIndex();
+        int blockID = index / (Constants.BLOCK_SIZE/Constants.INODE_SIZE);
         int inodeOffset = index % (Constants.BLOCK_SIZE/Constants.INODE_SIZE);
         byte[] buffer = new byte[Constants.BLOCK_SIZE];
         byte[] metadata = f.getSerializedMetadata();
-        
+
         DBuffer dbuf = cache.getBlock(blockID);
         dbuf.read(buffer, 0, Constants.BLOCK_SIZE);
         for(int i = 0 ; i < metadata.length; i++){
-        	buffer[inodeOffset*Constants.INODE_SIZE + i] = metadata[i];
+            buffer[inodeOffset*Constants.INODE_SIZE + i] = metadata[i];
         }
         dbuf.write(buffer, 0, Constants.BLOCK_SIZE);
         cache.releaseBlock(dbuf);
@@ -109,6 +112,7 @@ public class DFS {
     		Arrays.fill(usedBlockMap, false);
     		markInodeRegionAsUsed();
     	}
+    	
     	for (Inode f:inodeMap) {
     		f.clearContent();
     		f.setUsed(false);
@@ -202,9 +206,9 @@ public class DFS {
         int numBlocks = writesize / Constants.BLOCK_SIZE;
         if (writesize % Constants.BLOCK_SIZE > 0)
             numBlocks ++;
-        
+
         // find free blocks
-        int head = 0;
+        int head = Constants.NUM_OF_INODE / (Constants.BLOCK_SIZE / Constants.INODE_SIZE);
         synchronized(usedBlockMap) {
             for (int i = 0; i<numBlocks; i++) {
                 while (head<usedBlockMap.length && usedBlockMap[head] == true) {
@@ -214,6 +218,7 @@ public class DFS {
                     f.write.unlock();
                     return -1;
                 }
+                //                System.out.println("head = " + head);
                 usedBlockMap[head] = true;
                 f.addBlock(head);
             }
@@ -225,10 +230,19 @@ public class DFS {
         // update inode region on disk
         updateInode(f);
 
+
+
         List<Integer> blocks = f.getBlockList();
+
+        //        System.out.println("block size = " + blocks.size());
+
         for (int i=0; i<blocks.size(); i++) {
+//            System.out.println("Here: " + i);
+
             DBuffer dbuff = cache.getBlock(blocks.get(i));
             if (dbuff.write(buffer, startOffset + i*Constants.BLOCK_SIZE, Math.min(writesize - i*Constants.BLOCK_SIZE, Constants.BLOCK_SIZE)) == -1) {
+                //                System.out.println("Here");
+
                 cache.releaseBlock(dbuff);
                 f.write.unlock();
                 return -1;
@@ -273,8 +287,8 @@ public class DFS {
 
     /* Write back all dirty blocks to the volume, and wait for completion. */
     public void sync() {
-    	for(Inode f: inodeMap)
-    		updateInode(f);
+        for(Inode f: inodeMap)
+            updateInode(f);
         cache.sync();               // ?????????????????????????????
     }
 }

@@ -21,7 +21,7 @@ public class DFSTest {
 	
 	@BeforeClass
 	public static void setUpBeforeClass() throws Exception {
-		dfs = new DFS();
+		dfs = new DFS(true);
 	}
 
 	@AfterClass
@@ -189,6 +189,73 @@ public class DFSTest {
 		assertFalse(dfs.listAllDFiles().contains(delCandidate));
 	}
 	
-	
-	
+    @Test
+    public void testMultipleThread() {
+        dfs.format();
+        int threadNum = 100;
+        int fileNum = Constants.NUM_OF_INODE / threadNum;
+        Thread[] threads = new Thread[threadNum];
+        for (int i=0; i<threadNum; i++) {
+            threads[i] = new Thread(new TestThread(i, fileNum, dfs));
+            threads[i].start();
+        }
+
+        for (Thread t:threads) {
+            try {
+                t.join();
+            } catch (InterruptedException e) {
+                e.printStackTrace();
+            }
+        }
+    }
+}
+
+class TestThread implements Runnable {
+    private int fileNum;
+    private int ID;
+    private DFS dfs;
+    HashMap<Integer, byte[]> buffers = new HashMap<Integer,byte[]>();
+    DFileID[] fileIDs;
+
+    public TestThread(int ID, int fileNum, DFS dfs) {
+        this.ID = ID;
+        this.fileNum = fileNum;
+        this.dfs = dfs;
+        
+        fileIDs = new DFileID[fileNum];
+    }
+
+    @Override
+    public void run() {
+        Random r = new Random(ID * 100);
+        
+        for (int k=0; k<fileNum; k++) {
+            DFileID file = dfs.createDFile();
+            fileIDs[k] = file;
+            byte[] writeBuffer = new byte[Math.abs(r.nextInt()) % (Constants.NUM_OF_BLOCK_IN_DFILE*Constants.BLOCK_SIZE)];
+            for(int i = 0; i < writeBuffer.length; i++){
+                writeBuffer[i] = (byte) (i*i + k * ID);
+            }
+            int count = dfs.write(fileIDs[k], writeBuffer, 0, writeBuffer.length);
+            if (count > 0){
+                assertEquals(writeBuffer.length, count);
+                buffers.put(file.getID(), writeBuffer);
+                System.out.println("Thread " + this.ID + " wrote " + writeBuffer.length + "bytes to file " + file.getID());
+            }
+            else{
+                System.out.println("Thread " + ID + " failed to write to file " + file.getID());
+                break;
+            }
+        }
+        
+        for (int k=0; k<fileNum; k++) {
+            DFileID file = fileIDs[k];
+            System.out.println("Thread " + ID + " starting to read file " + file.getID());
+            byte[] writeBuffer = buffers.get(file.getID());
+            byte[] readBuffer = new byte[writeBuffer.length];
+            assertEquals(writeBuffer.length, dfs.read(file, readBuffer, 0, writeBuffer.length));
+            assertTrue(Arrays.equals(writeBuffer, readBuffer));
+            System.out.println("Thread " + ID + " read file " + file.getID() + " successfully");
+        }
+    }
 }

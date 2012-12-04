@@ -6,6 +6,7 @@ public class DBuffer {
     private Integer blockID;
     private Boolean valid;
     private Boolean busy;
+    private Boolean dirty;
 
     public DBuffer() {
 

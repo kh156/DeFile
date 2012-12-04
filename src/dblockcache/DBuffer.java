@@ -106,7 +106,7 @@ public class DBuffer {
             return -1;
         if (!valid) {
             startFetch();
-            this.waitValid();
+            waitValid();
         }
         for(int i = 0; i < count; i++){
             buffer[startOffset+i] = this.buffer[i];

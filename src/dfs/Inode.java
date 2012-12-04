@@ -5,8 +5,6 @@ import java.io.ByteArrayOutputStream;
 import java.io.DataInputStream;
 import java.io.DataOutputStream;
 import java.io.IOException;
-import java.io.ObjectInputStream;
-import java.io.Serializable;
 import java.util.*;
 import java.util.concurrent.locks.Lock;
 import java.util.concurrent.locks.ReentrantReadWriteLock;
@@ -14,11 +12,6 @@ import java.util.concurrent.locks.ReentrantReadWriteLock;
 import common.Constants;
 
 public class Inode{
-	
-	/**
-	 * 
-	 */
-	private static final long serialVersionUID = -2718967990195874435L;
 	
 	private int index;                      // Need set lock on these variables??????????????
     private List<Integer> blockList;

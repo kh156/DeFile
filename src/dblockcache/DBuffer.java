@@ -25,7 +25,6 @@ public class DBuffer {
 
     private void startFetch() {
         try {
-            clean = false;
             vd.startRequest(this, DiskOperationType.READ);
         } catch (IllegalArgumentException e) {
             // TODO Auto-generated catch block
@@ -34,12 +33,10 @@ public class DBuffer {
             // TODO Auto-generated catch block
             e.printStackTrace();
         }
-        this.waitClean();
     }
 
     private void startPush() {
         try {
-            clean = false;
             vd.startRequest(this, DiskOperationType.WRITE);
         } catch (IllegalArgumentException e) {
             // TODO Auto-generated catch block
@@ -48,19 +45,20 @@ public class DBuffer {
             // TODO Auto-generated catch block
             e.printStackTrace();
         }
-        this.waitClean();
     }
-    
+
     public void evict() {
-        startPush();
-        this.clean = true;
+        if (this.clean = false) {
+            startPush();
+            this.waitClean();
+        }
     }
 
     public boolean checkValid() {
         return valid;
     }
 
-    public boolean waitValid() {
+    public synchronized boolean waitValid() {
         while(valid == false){
             try {
                 wait();
@@ -72,16 +70,18 @@ public class DBuffer {
         return valid;
     }
 
-    public void setValid(boolean v) {
+    public synchronized void setValid(boolean v) {
         valid = v;
-        notifyAll();
+        if (v = true) {
+            notifyAll();
+        }
     }
 
     public boolean checkClean() {
         return clean;
     }
 
-    public boolean waitClean() {
+    public synchronized boolean waitClean() {
         while(clean == false){
             try {
                 wait();
@@ -106,11 +106,11 @@ public class DBuffer {
             return -1;
         if (!valid) {
             startFetch();
+            this.waitValid();
         }
         for(int i = 0; i < count; i++){
             buffer[startOffset+i] = this.buffer[i];
         }
-        this.valid = true;
         return count;
     }
 
@@ -124,14 +124,17 @@ public class DBuffer {
         for (int i=count; i<this.buffer.length; i++) {
             this.buffer[i] = 0; 
         }
+        
+        // mark valid!!!!
         this.valid = true;
         // mark dirty!!!!
         this.clean = false;
         return count;
     }
 
-    public void ioComplete() {
+    public synchronized void ioComplete() {
         clean = true;
+        valid = true;
         notifyAll();
     }
 

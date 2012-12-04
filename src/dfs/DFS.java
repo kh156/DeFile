@@ -43,6 +43,12 @@ public class DFS {
             
             inodeMap[i] = new Inode(i);
             inodeMap[i].initializeFromSerializedMetadata(buffer, inodeOffset*Constants.INODE_SIZE, Constants.INODE_SIZE);
+            
+            if (inodeMap[i].isUsed()) {
+                for (int k:inodeMap[i].getBlockList()) {
+                    usedBlockMap[k] = true; 
+                }
+            }
         }
     }
     

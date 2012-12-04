@@ -67,7 +67,7 @@ public class DFS {
         
         DBuffer dbuf = cache.getBlock(blockID);
         dbuf.read(buffer, 0, Constants.BLOCK_SIZE);
-        for(int i = 0 ; i < Constants.INODE_SIZE; i++){
+        for(int i = 0 ; i < metadata.length; i++){
         	buffer[inodeOffset*Constants.INODE_SIZE + i] = metadata[i];
         }
         dbuf.write(buffer, 0, Constants.BLOCK_SIZE);

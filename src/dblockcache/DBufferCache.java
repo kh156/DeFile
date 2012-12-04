@@ -44,29 +44,6 @@ public class DBufferCache {
      * cannot change.
      */
     public synchronized DBuffer getBlock(int blockID) {
-        //        synchronized(held[blockID]) {
-        //            while (held[blockID]) {
-        //                held[blockID].wait();
-        //            }
-        //            held[blockID] = true;
-        //        }
-        //        DBuffer buff = null;
-        //        synchronized(buffers) {
-        //            for (DBuffer b:buffers) {
-        //                if (b.getBlockID() == blockID) {
-        //                    return b;
-        //                }
-        //            }
-        //            for (DBuffer b:buffers) {
-        //                synchronized(held[b.getBlockID()]) {
-        //                    if (!held[b.getBlockID()]) {
-        //                        b.setBlockID(blockID);
-        //                        b.setValid(false);
-        //                        return b;
-        //                    }
-        //                }
-        //            }
-        //        }
         while (true) {
             boolean foundBlock = false;
             for (DBuffer b:buffers) {

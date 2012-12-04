@@ -25,7 +25,6 @@ public class DBuffer {
 
     private void startFetch() {
         try {
-            valid = false;
             vd.startRequest(this, DiskOperationType.READ);
         } catch (IllegalArgumentException e) {
             // TODO Auto-generated catch block
@@ -38,7 +37,6 @@ public class DBuffer {
 
     private void startPush() {
         try {
-            valid = false;
             vd.startRequest(this, DiskOperationType.WRITE);
         } catch (IllegalArgumentException e) {
             // TODO Auto-generated catch block
@@ -48,11 +46,11 @@ public class DBuffer {
             e.printStackTrace();
         }
     }
-    
+
     public void evict() {
-        if(clean == false){
-        	startPush();
-        	waitClean();
+        if (this.clean = false) {
+            startPush();
+            this.waitClean();
         }
     }
 
@@ -74,7 +72,9 @@ public class DBuffer {
 
     public synchronized void setValid(boolean v) {
         valid = v;
-        notifyAll();
+        if (v = true) {
+            notifyAll();
+        }
     }
 
     public boolean checkClean() {
@@ -124,6 +124,8 @@ public class DBuffer {
         for (int i=count; i<this.buffer.length; i++) {
             this.buffer[i] = 0; 
         }
+        
+        // mark valid!!!!
         this.valid = true;
         // mark dirty!!!!
         this.clean = false;
@@ -131,8 +133,8 @@ public class DBuffer {
     }
 
     public synchronized void ioComplete() {
-        valid = true;
         clean = true;
+        valid = true;
         notifyAll();
     }
 

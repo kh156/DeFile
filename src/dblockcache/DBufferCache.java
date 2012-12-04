@@ -12,7 +12,6 @@ public class DBufferCache {
 
     private int _cacheSize;
     private LinkedList<DBuffer> buffers;
-    //    private Boolean[] held = new Boolean[Constants.NUM_OF_BLOCKS];
 
     /*
      * Constructor: allocates a cacheSize number of cache blocks, each
@@ -74,7 +73,6 @@ public class DBufferCache {
                     // unused
                     b.setBusy(true);
                     b.setBlockID(blockID);
-                    b.setValid(false);
                     buffers.remove(b);
                     buffers.add(b);
                     return b;

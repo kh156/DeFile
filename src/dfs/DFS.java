@@ -15,7 +15,7 @@ public class DFS {
 
     private DBufferCache cache;
     private Inode[] inodeMap;
-    private boolean[] blockMap;
+    private boolean[] usedBlockMap;
 
 
     DFS(String volName, boolean format) {
@@ -23,7 +23,7 @@ public class DFS {
         _format = format;
         cache = new DBufferCache(Constants.CACHE_SIZE);
         inodeMap = new Inode[Constants.NUM_OF_INODE];
-        blockMap = new boolean[Constants.NUM_OF_BLOCKS];        // lock on the map????????????
+        usedBlockMap = new boolean[Constants.NUM_OF_BLOCKS];        // lock on the map????????????
 
 
         initializeInode();
@@ -53,8 +53,8 @@ public class DFS {
             for (Inode f:inodeMap) {
                 f.write.lock();
             }
-            synchronized(blockMap) {
-                Arrays.fill(blockMap, false);
+            synchronized(usedBlockMap) {
+                Arrays.fill(usedBlockMap, false);
             }
             for (Inode f:inodeMap) {
                 f.clearContent();
@@ -91,9 +91,9 @@ public class DFS {
     public void destroyDFile(DFileID dFID) {
         Inode f = inodeMap[dFID.getID()];
         f.write.lock();
-        synchronized(blockMap) {
+        synchronized(usedBlockMap) {
             for (int i:f.getBlockList()) {
-                blockMap[i] = false;
+                usedBlockMap[i] = false;
             }
         }
         f.clearContent();
@@ -142,9 +142,9 @@ public class DFS {
         }
 
         // clear used blocks first
-        synchronized(blockMap) {
+        synchronized(usedBlockMap) {
             for (int i:f.getBlockList()) {
-                blockMap[i] = false;
+                usedBlockMap[i] = false;
             }
         }
         f.clearContent();
@@ -156,16 +156,16 @@ public class DFS {
         
         // find free blocks
         int head = 0;
-        synchronized(blockMap) {
+        synchronized(usedBlockMap) {
             for (int i= Constants.NUM_OF_INODE / (Constants.BLOCK_SIZE / Constants.INODE_SIZE); i<numBlocks; i++) {
-                while (head<blockMap.length && blockMap[head] == true) {
+                while (head<usedBlockMap.length && usedBlockMap[head] == true) {
                     head++;
                 }
-                if (head >= blockMap.length) {
+                if (head >= usedBlockMap.length) {
                     f.write.unlock();
                     return -1;
                 }
-                blockMap[head] = true;
+                usedBlockMap[head] = true;
                 f.addBlock(head);
             }
         }

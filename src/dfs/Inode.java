@@ -1,5 +1,6 @@
 package dfs;
 
+import java.io.Serializable;
 import java.util.*;
 import java.util.concurrent.locks.Lock;
 import java.util.concurrent.locks.ReadWriteLock;
@@ -7,9 +8,11 @@ import java.util.concurrent.locks.ReentrantReadWriteLock;
 
 import common.Constants;
 
-public class Inode {
-
-    private int index;                      // Need set lock on these variables??????????????
+public class Inode implements Serializable{
+	
+	private static final long serialVersionUID = -2718967990195874435L;
+	
+	private int index;                      // Need set lock on these variables??????????????
     private List<Integer> blockList;
     private int size;
     private boolean isUsed;

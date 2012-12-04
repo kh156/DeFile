@@ -77,10 +77,8 @@ public class VirtualDisk implements IVirtualDisk, Runnable {
     }
 
     private void enqueue(VirtualDiskRequest vdr) {
-        synchronized(queue){
-            queue.add(vdr);
-        }
         synchronized(requestPoolLock){
+            queue.add(vdr);
             requestPoolLock.notify();
         }
     }

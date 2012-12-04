@@ -98,8 +98,12 @@ public class DBufferImpl extends DBuffer {
 
 	@Override
 	public synchronized int read(byte[] buffer, int startOffset, int count) {
-		if(!valid || startOffset < 0 || startOffset + count < buffer.length || count > this.size)
+		if(startOffset < 0 || startOffset + count < buffer.length || count > this.size)
 			return -1;
+		if(!valid){
+			startFetch();
+			waitValid();
+		}
 		for(int i = 0; i < count; i++){
 			buffer[startOffset+i] = this.buffer[i];
 		}
@@ -108,8 +112,12 @@ public class DBufferImpl extends DBuffer {
 
 	@Override
 	public synchronized int write(byte[] buffer, int startOffset, int count) {
-		if(!valid || startOffset < 0 || startOffset + count < buffer.length || count > this.size)
+		if(startOffset < 0 || startOffset + count < buffer.length || count > this.size)
 			return -1;
+		if(!valid){
+			startPush();
+			waitClean();
+		}
 		for(int i = 0; i < count; i++){
 			this.buffer[i] = buffer[startOffset+i];
 		}

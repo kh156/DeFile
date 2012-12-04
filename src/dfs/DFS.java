@@ -25,8 +25,7 @@ public class DFS {
         inodeMap = new Inode[Constants.NUM_OF_INODE];
         usedBlockMap = new boolean[Constants.NUM_OF_BLOCKS];        // lock on the map????????????
 
-
-        initializeInode();
+        initializeInodes();
     }
 
     DFS(boolean format) {
@@ -37,10 +36,13 @@ public class DFS {
         this(Constants.vdiskName,false);
     }
 
-    private void initializeInode() {
+    private void initializeInodes() {
         for (int i=0; i<inodeMap.length; i++) {
             inodeMap[i] = new Inode(i);
-            inodeMap[i].initializeFromDisk();
+            int blockID = i / (Constants.BLOCK_SIZE/Constants.INODE_SIZE);
+            int inodeOffset = i % (Constants.BLOCK_SIZE/Constants.INODE_SIZE);
+            byte[] buffer = cache.getBlock(blockID).getBuffer();
+            inodeMap[i].initializeFromSerializedMetadata(buffer, inodeOffset*Constants.INODE_SIZE, Constants.INODE_SIZE);
         }
     }
 
@@ -118,7 +120,7 @@ public class DFS {
         List<Integer> blocks = f.getBlockList();
         for (int i=0; i<blocks.size(); i++) {
             DBuffer dbuff = cache.getBlock(blocks.get(i));
-            if (dbuff.read(buffer, startOffset + i*Constants.BLOCK_SIZE, readsize - i*Constants.BLOCK_SIZE) == -1) {
+            if (dbuff.read(buffer, startOffset + i*Constants.BLOCK_SIZE, Math.min(readsize - i*Constants.BLOCK_SIZE, Constants.BLOCK_SIZE)) == -1) {
                 cache.releaseBlock(dbuff);
                 f.read.unlock();
                 return -1;

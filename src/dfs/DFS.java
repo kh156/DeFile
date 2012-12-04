@@ -1,7 +1,6 @@
 package dfs;
 
 import java.util.*;
-import java.util.concurrent.locks.ReadWriteLock;
 
 import common.Constants;
 import common.DFileID;

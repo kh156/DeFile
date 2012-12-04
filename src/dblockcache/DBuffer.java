@@ -1,108 +1,141 @@
 package dblockcache;
 
+import java.io.IOException;
+
+import common.Constants.DiskOperationType;
+
+import virtualdisk.VirtualDisk;
 
 public class DBuffer {
 
-    private Integer blockID;
-    private Boolean valid;
-    private Boolean busy;
-    private Boolean dirty;
+    private byte[] buffer;
+    private boolean busy = false;
+    private boolean clean = true;
+    private boolean valid = false;
+    private int blockID;
+    private int size;
+    private VirtualDisk vd;
 
-    public DBuffer() {
-
+    public DBuffer(VirtualDisk vd, int blockID, int size){
+        this.vd = vd;
+        this.blockID = blockID;
+        this.size = size;
+        buffer = new byte[size];
     }
 
-    /* Start an asynchronous fetch of associated block from the volume */
     public void startFetch() {
-
+        try {
+            clean = false;
+            vd.startRequest(this, DiskOperationType.READ);
+        } catch (IllegalArgumentException e) {
+            // TODO Auto-generated catch block
+            e.printStackTrace();
+        } catch (IOException e) {
+            // TODO Auto-generated catch block
+            e.printStackTrace();
+        }
+        this.waitClean();
     }
 
-    /* Start an asynchronous write of buffer contents to block on volume */
     public void startPush() {
-
-    }
-
-    /* Check whether the buffer has valid data */ 
-    public boolean checkValid() {
-        synchronized(valid) {
-            return valid;
+        try {
+            clean = false;
+            vd.startRequest(this, DiskOperationType.WRITE);
+        } catch (IllegalArgumentException e) {
+            // TODO Auto-generated catch block
+            e.printStackTrace();
+        } catch (IOException e) {
+            // TODO Auto-generated catch block
+            e.printStackTrace();
         }
+        this.waitClean();
     }
 
-    public void setValid(boolean v) {
-        synchronized(valid) {
-            valid = v;
+    public synchronized boolean checkValid() {
+        return valid;
+    }
+
+    public synchronized boolean waitValid() {
+        while(valid == false){
+            try {
+                wait();
+            } catch (InterruptedException e) {
+                // TODO Auto-generated catch block
+                e.printStackTrace();
+            }
         }
+        return valid;
     }
 
-    /* Wait until the buffer is free */
-    public boolean waitValid() {
-
+    public synchronized void setValid(boolean v) {
+        valid = v;
+        notifyAll();
     }
 
-    /* Check whether the buffer is dirty, i.e., has modified data to be written back */
-    public boolean checkClean() {
-
+    public synchronized boolean checkClean() {
+        return clean;
     }
 
-    /* Wait until the buffer is clean, i.e., until a push operation completes */
-    public boolean waitClean() {
-
-    }
-
-    /* Check if buffer is evictable: not evictable if I/O in progress, or buffer is held */
-    public boolean isBusy() {
-        synchronized(busy) {
-            return busy;
+    public synchronized boolean waitClean() {
+        while(clean == false){
+            try {
+                wait();
+            } catch (InterruptedException e) {
+                // TODO Auto-generated catch block
+                e.printStackTrace();
+            }
         }
+        return clean;
     }
 
-    public void setBusy(boolean b) {
-        synchronized(busy) {
-            busy = b;
+    public synchronized boolean isBusy() {
+        return busy;
+    }
+
+    public synchronized void setBusy(boolean b) {
+        busy = b;
+    }
+
+    public synchronized int read(byte[] buffer, int startOffset, int count) {
+        if(startOffset < 0 || startOffset + count < buffer.length || count > this.size)
+            return -1;
+        if (!valid) {
+            startFetch();
         }
-    }
-
-    /*
-     * reads into the buffer[] array from the contents of the DBuffer. Check
-     * first that the DBuffer has a valid copy of the data! startOffset and
-     * count are for the buffer array, not the DBuffer. Upon an error, it should
-     * return -1, otherwise return number of bytes read.
-     */
-    public int read(byte[] buffer, int startOffset, int count) {
-
-    }
-
-    /*
-     * writes into the DBuffer from the contents of buffer[] array. startOffset
-     * and count are for the buffer array, not the DBuffer. Mark buffer dirty!
-     * Upon an error, it should return -1, otherwise return number of bytes
-     * written.
-     */
-    public int write(byte[] buffer, int startOffset, int count) {
-
-    }
-
-    /* An upcall from VirtualDisk layer to inform the completion of an IO operation */
-    public void ioComplete() {
-
-    }
-
-    /* An upcall from VirtualDisk layer to fetch the blockID associated with a startRequest operation */
-    public int getBlockID() {
-        synchronized(blockID) {
-            return blockID;
+        for(int i = 0; i < count; i++){
+            buffer[startOffset+i] = this.buffer[i];
         }
+        return count;
     }
 
-    public void setBlockID(int id) {
-        synchronized(blockID) {
-            blockID = id;
+    public synchronized int write(byte[] buffer, int startOffset, int count) {
+        if(startOffset < 0 || startOffset + count < buffer.length || count > this.size)
+            return -1;
+        if (!valid) {
+            startPush();
         }
+        for(int i = 0; i < count; i++){
+            this.buffer[i] = buffer[startOffset+i];
+        }
+        return count;
     }
 
-    /* An upcall from VirtualDisk layer to fetch the buffer associated with DBuffer object*/
-    public byte[] getBuffer() {
-
+    public synchronized void ioComplete() {
+        clean = true;
+        notifyAll();
     }
+
+    public synchronized int getBlockID() {
+        return blockID;
+    }
+
+    public synchronized void setBlockID(int id) {
+        blockID = id;
+    }
+
+    public synchronized byte[] getBuffer() {
+        //can simply return buffer?? or need to copy?
+        return buffer;
+    }
+
 }

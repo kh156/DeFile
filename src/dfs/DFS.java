@@ -39,13 +39,13 @@ public class DFS {
         for (int i=0; i<inodeMap.length; i++) {
             int blockID = i / (Constants.BLOCK_SIZE/Constants.INODE_SIZE);
             int inodeOffset = i % (Constants.BLOCK_SIZE/Constants.INODE_SIZE);
-            byte[] buffer = new byte[Constants.INODE_SIZE];
+            byte[] buffer = new byte[Constants.BLOCK_SIZE];
             DBuffer dbuf = cache.getBlock(blockID);
-            dbuf.read(buffer, inodeOffset*Constants.INODE_SIZE, Constants.INODE_SIZE);
+            dbuf.read(buffer, 0, Constants.BLOCK_SIZE);
             cache.releaseBlock(dbuf);
             
             inodeMap[i] = new Inode(i);
-            inodeMap[i].initializeFromSerializedMetadata(buffer, 0, Constants.INODE_SIZE);
+            inodeMap[i].initializeFromSerializedMetadata(buffer, inodeOffset*Constants.INODE_SIZE, Constants.INODE_SIZE);
             
             if(inodeMap[i].isUsed()){
             	for(int k : inodeMap[i].getBlockList()){

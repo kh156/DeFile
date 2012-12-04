@@ -17,7 +17,7 @@ public class DFS {
     private boolean[] usedBlockMap;
 
 
-    DFS(String volName, boolean format) {
+    public DFS(String volName, boolean format) {
         _volName = volName;
         _format = format;
         cache = new DBufferCache(_volName, format, Constants.CACHE_SIZE);
@@ -27,11 +27,11 @@ public class DFS {
         initializeAllInodes();
     }
 
-    DFS(boolean format) {
+    public DFS(boolean format) {
         this(Constants.vdiskName,format);
     }
 
-    DFS() {
+    public DFS() {
         this(Constants.vdiskName,false);
     }
 
@@ -40,10 +40,21 @@ public class DFS {
             int blockID = i / (Constants.BLOCK_SIZE/Constants.INODE_SIZE);
             int inodeOffset = i % (Constants.BLOCK_SIZE/Constants.INODE_SIZE);
             byte[] buffer = new byte[Constants.INODE_SIZE];
-            cache.getBlock(blockID).read(buffer, inodeOffset*Constants.INODE_SIZE, Constants.INODE_SIZE);
+            DBuffer dbuf = cache.getBlock(blockID);
+            dbuf.read(buffer, inodeOffset*Constants.INODE_SIZE, Constants.INODE_SIZE);
+            cache.releaseBlock(dbuf);
             
             inodeMap[i] = new Inode(i);
             inodeMap[i].initializeFromSerializedMetadata(buffer, 0, Constants.INODE_SIZE);
+            
+            if(inodeMap[i].isUsed()){
+            	for(int k : inodeMap[i].getBlockList()){
+            		if(usedBlockMap[k])
+            			System.err.println("A block is being used by two different inodes");
+            		else
+            			usedBlockMap[k] = true;
+            	}
+            }
         }
     }
     
@@ -54,11 +65,13 @@ public class DFS {
         byte[] buffer = new byte[Constants.BLOCK_SIZE];
         byte[] metadata = f.getSerializedMetadata();
         
-        cache.getBlock(blockID).read(buffer, 0, Constants.BLOCK_SIZE);
+        DBuffer dbuf = cache.getBlock(blockID);
+        dbuf.read(buffer, 0, Constants.BLOCK_SIZE);
         for(int i = 0 ; i < Constants.INODE_SIZE; i++){
         	buffer[inodeOffset*Constants.INODE_SIZE + i] = metadata[i];
         }
-        cache.getBlock(blockID).write(buffer, 0, Constants.BLOCK_SIZE);
+        dbuf.write(buffer, 0, Constants.BLOCK_SIZE);
+        cache.releaseBlock(dbuf);
     }
 
     /*

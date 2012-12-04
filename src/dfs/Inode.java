@@ -73,6 +73,9 @@ public class Inode{
         DataInputStream dis = new DataInputStream(bin);
         clearContent();
     	try{
+    		isUsed = dis.readBoolean();
+    		if(!isUsed)
+    			return;
     		int blockListSize = dis.readInt();
     		size = dis.readInt();
     		for(int i = 0; i < blockListSize; i++){
@@ -90,6 +93,7 @@ public class Inode{
     	ByteArrayOutputStream bout = new ByteArrayOutputStream();
     	DataOutputStream dos = new DataOutputStream(bout);
     	try {
+    		dos.writeBoolean(isUsed);
     		dos.writeInt(blockList.size());
 			dos.writeInt(size);
 			for(Integer blockID : blockList)

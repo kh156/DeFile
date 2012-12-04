@@ -25,7 +25,7 @@ public class DBuffer {
 
     private void startFetch() {
         try {
-            clean = false;
+            valid = false;
             vd.startRequest(this, DiskOperationType.READ);
         } catch (IllegalArgumentException e) {
             // TODO Auto-generated catch block
@@ -34,12 +34,11 @@ public class DBuffer {
             // TODO Auto-generated catch block
             e.printStackTrace();
         }
-        this.waitClean();
     }
 
     private void startPush() {
         try {
-            clean = false;
+            valid = false;
             vd.startRequest(this, DiskOperationType.WRITE);
         } catch (IllegalArgumentException e) {
             // TODO Auto-generated catch block
@@ -48,19 +47,20 @@ public class DBuffer {
             // TODO Auto-generated catch block
             e.printStackTrace();
         }
-        this.waitClean();
     }
     
     public void evict() {
-        startPush();
-        this.clean = true;
+        if(clean == false){
+        	startPush();
+        	waitClean();
+        }
     }
 
     public boolean checkValid() {
         return valid;
     }
 
-    public boolean waitValid() {
+    public synchronized boolean waitValid() {
         while(valid == false){
             try {
                 wait();
@@ -72,7 +72,7 @@ public class DBuffer {
         return valid;
     }
 
-    public void setValid(boolean v) {
+    public synchronized void setValid(boolean v) {
         valid = v;
         notifyAll();
     }
@@ -81,7 +81,7 @@ public class DBuffer {
         return clean;
     }
 
-    public boolean waitClean() {
+    public synchronized boolean waitClean() {
         while(clean == false){
             try {
                 wait();
@@ -106,6 +106,7 @@ public class DBuffer {
             return -1;
         if (!valid) {
             startFetch();
+            waitValid();
         }
         for(int i = 0; i < count; i++){
             buffer[startOffset+i] = this.buffer[i];
@@ -130,7 +131,8 @@ public class DBuffer {
         return count;
     }
 
-    public void ioComplete() {
+    public synchronized void ioComplete() {
+        valid = true;
         clean = true;
         notifyAll();
     }

@@ -18,13 +18,13 @@ public class DBufferCache {
      * Constructor: allocates a cacheSize number of cache blocks, each
      * containing BLOCK-size bytes data, in memory
      */
-    public DBufferCache(int cacheSize) {
+    public DBufferCache(String volName, boolean format, int cacheSize) {
         _cacheSize = cacheSize * Constants.BLOCK_SIZE;
         buffers = new LinkedList<DBuffer>();
         
         VirtualDisk vdk = null;
         try {
-            vdk = new VirtualDisk();
+            vdk = new VirtualDisk(volName, format);
         } catch (FileNotFoundException e) {
             // TODO Auto-generated catch block
             e.printStackTrace();

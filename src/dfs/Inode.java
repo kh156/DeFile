@@ -1,15 +1,17 @@
 package dfs;
 
-import java.io.Serializable;
+import java.io.ByteArrayInputStream;
+import java.io.ByteArrayOutputStream;
+import java.io.DataInputStream;
+import java.io.DataOutputStream;
+import java.io.IOException;
 import java.util.*;
 import java.util.concurrent.locks.Lock;
 import java.util.concurrent.locks.ReentrantReadWriteLock;
 
 import common.Constants;
 
-public class Inode implements Serializable{
-	
-	private static final long serialVersionUID = -2718967990195874435L;
+public class Inode{
 	
 	private int index;                      // Need set lock on these variables??????????????
     private List<Integer> blockList;
@@ -66,12 +68,38 @@ public class Inode implements Serializable{
         isUsed = f;
     }
     
-    public void initializeFromDisk() {
-        
+    public void initializeFromSerializedMetadata(byte[] buf, int offset, int length) {
+    	ByteArrayInputStream bin = new ByteArrayInputStream(buf,offset,length);
+        DataInputStream dis = new DataInputStream(bin);
+        clearContent();
+    	try{
+    		int blockListSize = dis.readInt();
+    		size = dis.readInt();
+    		for(int i = 0; i < blockListSize; i++){
+    			blockList.add(dis.readInt());
+    		}
+    		dis.close();
+    	} catch (IOException e){
+    		// TODO Auto-generated catch block
+    		e.printStackTrace();
+    	}
+    	return;
     }
     
-    public void updateDisk() {
-    
+    public byte[] getSerializedMetadata() {
+    	ByteArrayOutputStream bout = new ByteArrayOutputStream();
+    	DataOutputStream dos = new DataOutputStream(bout);
+    	try {
+    		dos.writeInt(blockList.size());
+			dos.writeInt(size);
+			for(Integer blockID : blockList)
+				dos.writeInt(blockID);
+			dos.close();
+		} catch (IOException e) {
+			// TODO Auto-generated catch block
+			e.printStackTrace();
+		}
+    	return bout.toByteArray();
     }
     
 }

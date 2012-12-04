@@ -20,12 +20,11 @@ public class DFS {
     DFS(String volName, boolean format) {
         _volName = volName;
         _format = format;
-        cache = new DBufferCache(Constants.CACHE_SIZE);
+        cache = new DBufferCache(_volName, format, Constants.CACHE_SIZE);
         inodeMap = new Inode[Constants.NUM_OF_INODE];
         usedBlockMap = new boolean[Constants.NUM_OF_BLOCKS];        // lock on the map????????????
 
-
-        initializeInode();
+        initializeAllInodes();
     }
 
     DFS(boolean format) {
@@ -36,11 +35,29 @@ public class DFS {
         this(Constants.vdiskName,false);
     }
 
-    private void initializeInode() {
+    private void initializeAllInodes() {
         for (int i=0; i<inodeMap.length; i++) {
+            int blockID = i / (Constants.BLOCK_SIZE/Constants.INODE_SIZE);
+            int inodeOffset = i % (Constants.BLOCK_SIZE/Constants.INODE_SIZE);
+            byte[] buffer = cache.getBlock(blockID).getBuffer();
+            
             inodeMap[i] = new Inode(i);
-            inodeMap[i].initializeFromDisk();
+            inodeMap[i].initializeFromSerializedMetadata(buffer, inodeOffset*Constants.INODE_SIZE, Constants.INODE_SIZE);
         }
+    }
+    
+    private void updateInode(Inode f) {
+    	int index = f.getIndex();
+    	int blockID = index / (Constants.BLOCK_SIZE/Constants.INODE_SIZE);
+        int inodeOffset = index % (Constants.BLOCK_SIZE/Constants.INODE_SIZE);
+        byte[] buffer = new byte[Constants.BLOCK_SIZE];
+        byte[] metadata = f.getSerializedMetadata();
+        
+        cache.getBlock(blockID).read(buffer, 0, Constants.BLOCK_SIZE);
+        for(int i = 0 ; i < Constants.INODE_SIZE; i++){
+        	buffer[inodeOffset*Constants.INODE_SIZE + i] = metadata[i];
+        }
+        cache.getBlock(blockID).write(buffer, 0, Constants.BLOCK_SIZE);
     }
 
     /*
@@ -58,7 +75,7 @@ public class DFS {
             for (Inode f:inodeMap) {
                 f.clearContent();
                 f.setUsed(false);
-                f.updateDisk();                // need optimized!!!!!!!!!!!!
+                updateInode(f);              // need optimized!!!!!!!!!!!!
             }
             for (Inode f:inodeMap) {
                 f.write.unlock();
@@ -77,7 +94,7 @@ public class DFS {
             if (!f.isUsed()) {
                 f.clearContent();
                 f.setUsed(true);
-                f.updateDisk();          
+                updateInode(f);          
                 f.write.unlock();
                 return new DFileID(f.getIndex());
             }
@@ -97,7 +114,7 @@ public class DFS {
         }
         f.clearContent();
         f.setUsed(false);
-        f.updateDisk();
+        updateInode(f);
         f.write.unlock();
     }
 
@@ -173,7 +190,7 @@ public class DFS {
         f.setSize(writesize);
 
         // update inode region on disk
-        f.updateDisk();
+        updateInode(f);
 
         List<Integer> blocks = f.getBlockList();
         for (int i=0; i<blocks.size(); i++) {
@@ -223,6 +240,8 @@ public class DFS {
 
     /* Write back all dirty blocks to the volume, and wait for completion. */
     public void sync() {
+    	for(Inode f: inodeMap)
+    		updateInode(f);
         cache.sync();               // ?????????????????????????????
     }
 }

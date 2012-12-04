@@ -102,7 +102,7 @@ public class DBuffer {
     }
 
     public int read(byte[] buffer, int startOffset, int count) {
-        if(startOffset < 0 || startOffset + count < buffer.length || count > this.size)
+        if(startOffset < 0 || startOffset + count > buffer.length || count > this.size)
             return -1;
         if (!valid) {
             startFetch();
@@ -115,7 +115,7 @@ public class DBuffer {
     }
 
     public int write(byte[] buffer, int startOffset, int count) {
-        if(startOffset < 0 || startOffset + count < buffer.length || count > this.size)
+        if(startOffset < 0 || startOffset + count > buffer.length || count > this.size)
             return -1;
         for(int i = 0; i < count; i++){
             this.buffer[i] = buffer[startOffset+i];

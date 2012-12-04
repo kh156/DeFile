@@ -23,8 +23,12 @@ public class DFS {
         cache = new DBufferCache(_volName, format, Constants.CACHE_SIZE);
         inodeMap = new Inode[Constants.NUM_OF_INODE];
         usedBlockMap = new boolean[Constants.NUM_OF_BLOCKS];        // lock on the map????????????
-
-        initializeAllInodes();
+        markInodeRegionAsUsed();
+        if(format){
+        	format();
+        }else{
+        	initializeAllInodes();
+        }
     }
 
     public DFS(boolean format) {
@@ -74,31 +78,33 @@ public class DFS {
         cache.releaseBlock(dbuf);
     }
 
-    /*
+    private void markInodeRegionAsUsed() {
+		for(int i = 0; i < (Constants.NUM_OF_INODE * Constants.INODE_SIZE) / Constants.BLOCK_SIZE; i++){
+			usedBlockMap[i] = true;
+		}
+	}
+
+	/*
      * If format is true, the system should format the underlying disk contents,
      * i.e., initialize to empty. On success returns true, else return false.
      */
     public synchronized boolean format() {
-        if (_format) {
-            for (Inode f:inodeMap) {
-                f.write.lock();
-            }
-            synchronized(usedBlockMap) {
-                Arrays.fill(usedBlockMap, false);
-            }
-            for (Inode f:inodeMap) {
-                f.clearContent();
-                f.setUsed(false);
-                updateInode(f);              // need optimized!!!!!!!!!!!!
-            }
-            for (Inode f:inodeMap) {
-                f.write.unlock();
-            }
-            return true;
-        }
-        else {
-            return false;
-        }
+    	for (Inode f:inodeMap) {
+    		f.write.lock();
+    	}
+    	synchronized(usedBlockMap) {
+    		Arrays.fill(usedBlockMap, false);
+    		markInodeRegionAsUsed();
+    	}
+    	for (Inode f:inodeMap) {
+    		f.clearContent();
+    		f.setUsed(false);
+    		updateInode(f);              // need optimized!!!!!!!!!!!!
+    	}
+    	for (Inode f:inodeMap) {
+    		f.write.unlock();
+    	}
+    	return true;
     }
 
     /* creates a new DFile and returns the DFileID, which is useful to uniquely identify the DFile*/
@@ -187,7 +193,7 @@ public class DFS {
         // find free blocks
         int head = 0;
         synchronized(usedBlockMap) {
-            for (int i= Constants.NUM_OF_INODE / (Constants.BLOCK_SIZE / Constants.INODE_SIZE); i<numBlocks; i++) {
+            for (int i = 0; i<numBlocks; i++) {
                 while (head<usedBlockMap.length && usedBlockMap[head] == true) {
                     head++;
                 }

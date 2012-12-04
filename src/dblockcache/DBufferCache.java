@@ -86,7 +86,7 @@ public class DBufferCache {
                     // evict
                     b.setBusy(true);
                     if (b.checkValid() && !b.checkClean()) {
-                        b.startPush();
+                        b.evict();
                     }
                     b.setBlockID(blockID);
                     b.setValid(false);
@@ -116,34 +116,22 @@ public class DBufferCache {
      */
     public synchronized void sync() {
         boolean[] heldmap = new boolean[buffers.size()];
-        while (true) {
-            boolean check = true;
-            for (int i=0; i<heldmap.length; i++ ) {
-                if (heldmap[i] == false) {
-                    check = false;
-                    break;
+        
+        for (int i=0; i<buffers.size(); i++) {
+            while (buffers.get(i).isBusy()) {
+                try {
+                    wait();
+                } catch (InterruptedException e) {
+                    e.printStackTrace();
                 }
             }
-            if (!check) {
-                for (int i=0; i<buffers.size(); i++) {
-                    while (buffers.get(i).isBusy()) {
-                        try {
-                            wait();
-                        } catch (InterruptedException e) {
-                            e.printStackTrace();
-                        }
-                    }
-                    buffers.get(i).setBusy(true);
-                    heldmap[i] = true;
-                }
-            }
-            else {
-                break;
-            }
+            buffers.get(i).setBusy(true);
+            heldmap[i] = true;
         }
+        
         for (DBuffer b:buffers) {
             if (b.checkValid() && !b.checkClean()) {
-                b.startPush();
+                b.evict();
             }
             b.setBusy(false);
         }

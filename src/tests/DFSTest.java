@@ -61,17 +61,21 @@ public class DFSTest {
 	
 	@Test
 	public void createFileAndWriteData() {
+	    DFileID file0 = dfs.createDFile();
+	    System.out.println(file0.getID());
 		DFileID file = dfs.createDFile();
+		System.out.println(file.getID());
 		assertEquals(dfs.sizeDFile(file),0);
 		
-		byte[] writeBuffer = new byte[Constants.BLOCK_SIZE];
-		for(int i = 0; i < Constants.BLOCK_SIZE; i++)
+		int size = Constants.BLOCK_SIZE * Constants.NUM_OF_BLOCK_IN_DFILE;
+		byte[] writeBuffer = new byte[size];
+		byte[] readBuffer = new byte[size];
+		for(int i = 0; i < size; i++)
 			writeBuffer[i] = (byte) (i*i);		//dummy data
-		dfs.write(file, writeBuffer, 0, Constants.BLOCK_SIZE);
-		byte[] readBuffer = new byte[Constants.BLOCK_SIZE];
-		dfs.read(file, readBuffer, 0, Constants.BLOCK_SIZE);
-		for(int i = 0; i < Constants.BLOCK_SIZE; i++){
-			System.out.println("wrote: " + writeBuffer[i] + " read: " + readBuffer[i]);
+		dfs.write(file, writeBuffer, 0, size);
+		dfs.read(file, readBuffer, 0, size);
+		for(int i = 0; i < size; i++){
+//			System.out.println("wrote: " + writeBuffer[i] + " read: " + readBuffer[i]);
 		}
 		assertTrue(Arrays.equals(readBuffer, writeBuffer));
 	}

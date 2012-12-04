@@ -111,7 +111,6 @@ public class DBuffer {
         for(int i = 0; i < count; i++){
             buffer[startOffset+i] = this.buffer[i];
         }
-        this.valid = true;
         return count;
     }
 

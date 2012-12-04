@@ -1,7 +1,10 @@
 package dblockcache;
 
+import java.io.FileNotFoundException;
+import java.io.IOException;
 import java.util.LinkedList;
-import java.util.Queue;
+
+import virtualdisk.VirtualDisk;
 
 import common.Constants;
 
@@ -18,8 +21,20 @@ public class DBufferCache {
     public DBufferCache(int cacheSize) {
         _cacheSize = cacheSize * Constants.BLOCK_SIZE;
         buffers = new LinkedList<DBuffer>();
+        
+        VirtualDisk vdk = null;
+        try {
+            vdk = new VirtualDisk();
+        } catch (FileNotFoundException e) {
+            // TODO Auto-generated catch block
+            e.printStackTrace();
+        } catch (IOException e) {
+            // TODO Auto-generated catch block
+            e.printStackTrace();
+        }
+        
         for (int i=0; i<cacheSize; i++) {
-            buffers.add(new DBuffer());
+            buffers.add(new DBuffer(vdk, 0, Constants.BLOCK_SIZE));
         }
     }
 

@@ -34,6 +34,7 @@ public class DFSTest {
 
 	@After
 	public void tearDown() throws Exception {
+		dfs.sync();
 	}
 
 	@Test
@@ -87,11 +88,11 @@ public class DFSTest {
 	@Test
 	public void createMultipleFiles(){
 		dfs.format();
-		for(int i = 0; i < 153; i++){
+		for(int i = 0; i < Constants.NUM_OF_INODE; i++){
 			assertNotNull(dfs.createDFile());
 		}
-		//assertNull(dfs.createDFile());
-		//assertEquals(Constants.NUM_OF_INODE, dfs.listAllDFiles().size());
+		assertNull(dfs.createDFile());
+		assertEquals(Constants.NUM_OF_INODE, dfs.listAllDFiles().size());
 		
 		Random r = new Random(12);
 		int remainingBlocks = Constants.NUM_OF_BLOCKS - (Constants.INODE_SIZE * Constants.NUM_OF_INODE) / Constants.BLOCK_SIZE;
@@ -107,8 +108,9 @@ public class DFSTest {
 			int count = dfs.write(file, writeBuffer, 0, writeBuffer.length);
 			if(remainingBlocks >= 0){
 				assertEquals(writeBuffer.length, count);
+				assertEquals(writeBuffer.length, dfs.sizeDFile(file));
 				buffers.put(file.getID(), writeBuffer);
-				System.out.println("Wrote " + writeBuffer.length + "bytes to file " + file.getID() + " with remaining blocks: " + remainingBlocks);
+				System.out.println("Wrote " + writeBuffer.length + " bytes to file " + file.getID() + " with remaining blocks: " + remainingBlocks);
 			}
 			else{
 				assertEquals(-1, count);
@@ -128,4 +130,65 @@ public class DFSTest {
 			System.out.println("Read file " + file.getID() + " successfully");
 		}
 	}
+	
+	@Test
+	public void createAndDeleteMultipleFiles(){
+		dfs.format();
+		Random r = new Random(123);
+		HashMap<Integer, byte[]> buffers = new HashMap<Integer,byte[]>();
+		for(int i = 0; i < 3000; i++){
+			int fileCount = dfs.listAllDFiles().size();
+			int rand = r.nextInt(4);
+			if(fileCount == Constants.NUM_OF_INODE || (rand == 0 && fileCount > 0)){
+				deleteRandomFile(r,buffers);
+			}else if(rand == 1 && fileCount>0){
+				checkRandomFile(r, buffers);
+			}
+			else{
+				putRandomFile(r,buffers);
+			}
+		}
+	}
+
+	private void checkRandomFile(Random r, HashMap<Integer, byte[]> buffers) {
+		List<DFileID> dfiles = dfs.listAllDFiles();
+		DFileID file = dfiles.get(r.nextInt(dfiles.size()));
+		
+		byte[] writeBuffer = buffers.get(file.getID());
+		byte[] readBuffer = new byte[writeBuffer.length];
+		assertEquals(writeBuffer.length, dfs.read(file, readBuffer, 0, writeBuffer.length));
+		assertTrue(Arrays.equals(writeBuffer, readBuffer));
+		System.out.println("Checked file " + file.getID() + " successfully");
+	}
+
+	private void putRandomFile(Random r, HashMap<Integer, byte[]> buffers) {
+		DFileID file = dfs.createDFile();
+		byte[] writeBuffer = new byte[r.nextInt(Constants.NUM_OF_BLOCK_IN_DFILE*Constants.BLOCK_SIZE)];
+		//remainingBlocks -= (int) Math.ceil((double)writeBuffer.length / Constants.BLOCK_SIZE);
+		for(int i = 0; i < writeBuffer.length; i++){
+			writeBuffer[i] = (byte) (i*i+file.getID());
+		}
+		int count = dfs.write(file, writeBuffer, 0, writeBuffer.length);
+		//if(remainingBlocks >= 0){
+			assertEquals(writeBuffer.length, count);
+			assertEquals(writeBuffer.length, dfs.sizeDFile(file));
+			buffers.put(file.getID(), writeBuffer);
+			System.out.println("Wrote " + writeBuffer.length + " bytes to file " + file.getID() );//+ " with remaining blocks: " + remainingBlocks);
+		//}
+			byte[] readBuffer = new byte[writeBuffer.length];
+			assertEquals(writeBuffer.length, dfs.read(file, readBuffer, 0, writeBuffer.length));
+			assertTrue(Arrays.equals(writeBuffer, readBuffer));
+			System.out.println("Read file " + file.getID() + " successfully");
+	}
+
+	private void deleteRandomFile(Random r, HashMap<Integer, byte[]> buffers) {
+		List<DFileID> dfiles = dfs.listAllDFiles();
+		DFileID delCandidate = dfiles.get(r.nextInt(dfiles.size()));
+		dfs.destroyDFile(delCandidate);
+		assertTrue(dfiles.size() == dfs.listAllDFiles().size() + 1);
+		assertFalse(dfs.listAllDFiles().contains(delCandidate));
+	}
+	
+	
+	
 }

@@ -52,11 +52,24 @@ public class DFS {
             inodeMap[i].initializeFromSerializedMetadata(buffer, inodeOffset*Constants.INODE_SIZE, Constants.INODE_SIZE);
             
             if(inodeMap[i].isUsed()){
-            	for(int k : inodeMap[i].getBlockList()){
-            		if(usedBlockMap[k])
-            			System.err.println("A block is being used by two different inodes");
-            		else
-            			usedBlockMap[k] = true;
+            	int size = inodeMap[i].getSize();
+            	int numBlocks = inodeMap[i].getBlockList().size();
+            	int expectedNumBlocks = (int) Math.ceil((double)size/Constants.BLOCK_SIZE);
+            	if(numBlocks != expectedNumBlocks){
+            		System.err.println("File " + i + " has corrupt size and is going to be erased");
+            		inodeMap[i].clearContent();
+            	}else{
+            		for(int k : inodeMap[i].getBlockList()){
+            			if(k < 0 || k >= Constants.NUM_OF_BLOCKS){
+            				System.err.println("File " + i + " has corrupt block list and is going to be erased");
+            				inodeMap[i].clearContent();
+            				break;
+            			}
+            			if(usedBlockMap[k])
+            				System.err.println("Block " + k + " is being used by inode " + i + " and some other");
+            			else
+            				usedBlockMap[k] = true;
+            		}
             	}
             }
         }

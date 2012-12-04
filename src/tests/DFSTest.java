@@ -10,6 +10,7 @@ import org.junit.Before;
 import org.junit.BeforeClass;
 import org.junit.Test;
 
+import common.Constants;
 import common.DFileID;
 
 import dfs.DFS;
@@ -58,6 +59,22 @@ public class DFSTest {
 		}
 	}
 	
+	@Test
+	public void createFileAndWriteData() {
+		DFileID file = dfs.createDFile();
+		assertEquals(dfs.sizeDFile(file),0);
+		
+		byte[] writeBuffer = new byte[Constants.BLOCK_SIZE];
+		for(int i = 0; i < Constants.BLOCK_SIZE; i++)
+			writeBuffer[i] = (byte) (i*i);		//dummy data
+		dfs.write(file, writeBuffer, 0, Constants.BLOCK_SIZE);
+		byte[] readBuffer = new byte[Constants.BLOCK_SIZE];
+		dfs.read(file, readBuffer, 0, Constants.BLOCK_SIZE);
+		for(int i = 0; i < Constants.BLOCK_SIZE; i++){
+			System.out.println("wrote: " + writeBuffer[i] + " read: " + readBuffer[i]);
+		}
+		assertTrue(Arrays.equals(readBuffer, writeBuffer));
+	}
 	
 
 }
